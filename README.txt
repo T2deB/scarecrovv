@@ -1,5 +1,19 @@
-
 # Scarecrovvs Simulation (CSV-driven)
+
+## Overview
+
+Scarecrovv is a lightweight simulation framework for a deck-builder / worker-placement prototype. It includes:
+- A fast game simulator (rounds, workers, actions per turn, passing)
+- Two bots: a simple greedy policy and an MCTS lookahead bot
+- CSV summary dumps + Markdown analysis reports
+
+## Install
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
 ## Edit cards without code
 - Open `/mnt/data/cards.csv` in Excel/Sheets.
