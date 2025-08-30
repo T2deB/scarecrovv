@@ -1,13 +1,33 @@
+# Python / venv
 .venv/
-env/
-.idea/
-.vscode/
 __pycache__/
-*.pyc
+*.py[cod]
+
+# OS / IDE
 .DS_Store
+.vscode/
+.idea/
+*.code-workspace
+
+# Build / dist
+build/
+dist/
+*.egg-info/
+
+# Tests / typing
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Project outputs (generated)
 summaries/
+logs/
 reports/
 *.md.html
-dist/
-build/
-*.egg-info/
+
+# Big docs (optional)
+*.docx
