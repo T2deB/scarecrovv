@@ -1,0 +1,6 @@
+id,name,buy_cost_plasma,play_cost_plasma,play_cost_ash,play_cost_shards,play_cost_nut,play_cost_berry,play_cost_mushroom,type,domain,mat_points,can_play_on_mat,effect
+G1,Drought,2,0,1,0,0,0,0,None,None,0,False,hand_size_delta_next_round:-1; self_plasma:1; self_gain:ash:1
+G2,Flood,2,0,0,0,0,0,1,None,None,0,False,hand_size_delta_next_round:+1; self_peek2_keep1:deck
+G3,Blight,2,0,0,1,0,0,0,None,None,0,False,end_round_all_compost:1
+G4,Plentiful Forage,2,0,0,0,0,1,0,None,None,0,False,forage_yield_bonus_this_round:+1; self_vp:1
+G5,Crown's Decree,2,0,1,1,0,0,0,None,None,0,False,first_to_play_three_domains:+2vp

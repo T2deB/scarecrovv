@@ -1,0 +1,26 @@
+id,name,buy_cost_plasma,play_cost_plasma,play_cost_ash,play_cost_shards,play_cost_nut,play_cost_berry,play_cost_mushroom,type,domain,mat_points,can_play_on_mat,effect
+O1,Bull,2,1,1,0,0,0,0,Farm,Slime,2,True,compost_one_from_hand;combo_cow_bull_gain_plasma_each_turn
+O2,Cow,2,0,1,1,0,0,0,Farm,Magic,1,True,draw:2;replace_pool:1;on_mat_draw_plus_1_each_round
+O3,Rat,2,2,1,0,0,0,1,Critter,Slime,0,True,requires_worker_compost_zone;copy_effect_of_pool_slime_once
+O4,Sheep,2,2,0,2,0,0,0,Farm,Radioactive,2,True,covers_two_mat_slots
+O5,Bountiful Harvest,2,2,0,0,0,0,0,None,None,1,True,trigger_on_resource_play_gain_same_type_on_mat
+O6,Sheep Dog,2,0,0,1,0,1,0,Farm,Slime,0,False,req_2_cards_on_mat;move_opponent_worker_both_gain
+O7,Deer,2,3,0,1,0,0,0,Wild,Radioactive,0,False,draw2;If_have_other_wild_on_mat_take_radioactive_from_pool_to_discard
+O8,Fox,2,3,2,0,0,0,0,Wild,Magic,0,True,on_mat_start_turn_draw1_discard1;If_discarded_from_hand_return_1_resource
+O9,Mice,2,3,0,0,0,0,0,Critter,Magic,0,False,may_compost_this_take_two_magic_from_pool_free
+O10,Owl,2,3,0,0,0,0,0,Wild,Magic,0,False,peek_supply_top_keep_or_skip_then_take_next
+O11,Murder of Crows,2,1,0,0,1,0,0,Critter,Slime,1,True,steal_1_resource;on_mat_when_other_steals_gain_same_from_supply
+A1,Scrounger Rat,2,0,1,0,0,0,0,Critter,Slime,0,True,draw:1;if_composted_gain:ash:1
+A2,Barn Cat,2,1,0,0,0,0,0,Farm,Magic,0,True,scry2_keep1
+A3,Graveyard Hound,2,0,0,1,0,0,0,Wild,Slime,0,True,steal_res_give_victim_ash1
+A4,Iodine Cow,2,1,1,0,0,0,0,Farm,Radioactive,1,True,if_played_farm_this_turn_vp1
+A5,Warren of Mice,2,0,1,0,0,0,0,Critter,Magic,0,True,on_mat_start_turn_draw1_discard1
+A6,Scabbed Ram,2,0,0,2,0,0,0,Farm,Slime,1,True,on_mat_farm_discount_1_once_per_turn
+A7,Owl Sentinel,2,2,0,0,0,0,0,Wild,Magic,0,True,scry_supply_peek_replace1
+A8,Carrion Crow,2,0,0,1,0,0,0,Critter,Radioactive,0,True,if_any_opponent_composted_draw1
+A9,Boar of Amber,2,1,0,1,0,0,0,Wild,Magic,1,True,gain_forage;on_mat_when_gain_forage_vp1_once_per_round
+A10,Two-Headed Sheep,2,2,0,0,0,0,0,Farm,Radioactive,2,True,covers_two_mat_slots
+A11,Bats in the Belfry,2,1,0,0,0,0,0,Critter,Magic,0,True,draw2_discard1
+A12,Mire Toad,2,0,1,0,0,0,0,Critter,Slime,0,True,move_own_worker_to_basic_field_gain
+A13,Stag of Cinders,2,1,1,0,0,0,0,Wild,Radioactive,1,True,if_spent_ash_this_turn_vp1
+A14,Herding Dog,2,0,0,1,0,1,0,Farm,Slime,0,True,move_any_worker_both_gain

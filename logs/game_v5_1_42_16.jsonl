@@ -1,0 +1,136 @@
+{"t": 0, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 1}
+{"t": 0, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 2}
+{"t": 0, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 1}
+{"t": 0, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 2}
+{"t": 0, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 1}
+{"t": 0, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 2}
+{"t": 1, "a": "initiative_start_player", "p": 0}
+{"t": 1, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 1, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 1, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 1, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 1, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 1, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 2, "a": "initiative_start_player", "p": 0}
+{"t": 2, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 3}
+{"t": 2, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 2, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 3}
+{"t": 2, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 2, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 3}
+{"t": 2, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 3, "a": "initiative_start_player", "p": 0}
+{"t": 3, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 4}
+{"t": 3, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 5}
+{"t": 3, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 4}
+{"t": 3, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 5}
+{"t": 3, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 4}
+{"t": 3, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 5}
+{"t": 4, "a": "initiative_start_player", "p": 0}
+{"t": 4, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 4, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 4, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 4, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 4, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 6}
+{"t": 4, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 5, "a": "initiative_start_player", "p": 0}
+{"t": 5, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 6}
+{"t": 5, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 7}
+{"t": 5, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 6}
+{"t": 5, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 5, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 7}
+{"t": 5, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 6, "a": "initiative_start_player", "p": 0}
+{"t": 6, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 8}
+{"t": 6, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 6, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 7}
+{"t": 6, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 6, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 8}
+{"t": 6, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 7, "a": "initiative_start_player", "p": 0}
+{"t": 7, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 9}
+{"t": 7, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 7, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 8}
+{"t": 7, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 9}
+{"t": 7, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 9}
+{"t": 7, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 10}
+{"t": 8, "a": "initiative_start_player", "p": 0}
+{"t": 8, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 10}
+{"t": 8, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 11}
+{"t": 8, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 10}
+{"t": 8, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 8, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 8, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 9, "a": "initiative_start_player", "p": 0}
+{"t": 9, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 9, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 9, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 9, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 9, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 11}
+{"t": 9, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 10, "a": "initiative_start_player", "p": 0}
+{"t": 10, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 12}
+{"t": 10, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 10, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 11}
+{"t": 10, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 12}
+{"t": 10, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 10, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 11, "a": "initiative_start_player", "p": 0}
+{"t": 11, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 13}
+{"t": 11, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 14}
+{"t": 11, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 13}
+{"t": 11, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 11, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 12}
+{"t": 11, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 13}
+{"t": 12, "a": "initiative_start_player", "p": 0}
+{"t": 12, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 15}
+{"t": 12, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 12, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 14}
+{"t": 12, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 15}
+{"t": 12, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 14}
+{"t": 12, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 13, "a": "initiative_start_player", "p": 0}
+{"t": 13, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 16}
+{"t": 13, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 13, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 13, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 13, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 15}
+{"t": 13, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 16}
+{"t": 14, "a": "initiative_start_player", "p": 0}
+{"t": 14, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 17}
+{"t": 14, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 18}
+{"t": 14, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 16}
+{"t": 14, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 14, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 17}
+{"t": 14, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 15, "a": "initiative_start_player", "p": 0}
+{"t": 15, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 15, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 15, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 17}
+{"t": 15, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 18}
+{"t": 15, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 15, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 16, "a": "initiative_start_player", "p": 0}
+{"t": 16, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 19}
+{"t": 16, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 20}
+{"t": 16, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 19}
+{"t": 16, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 20}
+{"t": 16, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 18}
+{"t": 16, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 19}
+{"t": 17, "a": "initiative_start_player", "p": 0}
+{"t": 17, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 21}
+{"t": 17, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 22}
+{"t": 17, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 17, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 17, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 20}
+{"t": 17, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 21}
+{"t": 18, "a": "initiative_start_player", "p": 0}
+{"t": 18, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 18, "a": "play_res", "p": 0, "res": "plasma"}
+{"t": 18, "a": "play_vp", "p": 1, "vp": 1, "bonus": 0, "total": 21}
+{"t": 18, "a": "play_res", "p": 1, "res": "plasma"}
+{"t": 18, "a": "play_vp", "p": 2, "vp": 1, "bonus": 0, "total": 22}
+{"t": 18, "a": "play_res", "p": 2, "res": "plasma"}
+{"t": 19, "a": "initiative_start_player", "p": 0}
+{"t": 19, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 23}
+{"t": 19, "a": "play_vp", "p": 0, "vp": 1, "bonus": 0, "total": 24}
+{"t": 19, "a": "end", "winner": 0}
