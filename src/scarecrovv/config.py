@@ -20,12 +20,14 @@ class Config:
     vp_cost_3 = 2
 
     # play costs
-    vp1_play_cost = {
-        "plasma": 1,
-        "shards": 1,
-        "__choice_one_of__": ["plasma","shards","ash","nut","berry","mushroom"],
-    }
-    vp3_play_cost = {"plasma":1,"ash":1,"shards":1,"nut":1,"berry":1,"mushroom":1}
+    vp1_play_cost_options = [
+    {"plasma": 2, "shards": 1},
+    {"plasma": 1, "shards": 2},
+    {"plasma": 1, "shards": 1, "ash": 1},
+]
+
+    # VP3: expensive, but only using existing resources for now
+    vp3_play_cost = {"plasma": 1, "ash": 1, "shards": 1, "nut": 1}
 
     # Bot knobs
     mcts:int=1

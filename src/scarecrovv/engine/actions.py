@@ -17,6 +17,50 @@ Action = Tuple[str, Optional[tuple]]
 # Payment helpers (UPDATED)
 # ----------------------------
 
+# ----------------------------
+# VP cost helpers (choices + concrete)
+# ----------------------------
+
+def _vp_play_cost(g, value: int) -> dict:
+    """
+    Returns either a concrete cost dict (e.g. {"plasma":1,"ash":1,"nut":1})
+    or a CHOICE bundle: {"__choice__":[{"plasma":2,"shards":1}, {"plasma":1,"shards":2}, ...]}
+    """
+    if value == 1:
+        opts = getattr(g.cfg, "vp1_play_cost_options", None)
+        if isinstance(opts, list) and opts:
+            # normalize to plain dicts
+            return {"__choice__": [dict(o) for o in opts]}
+        return {}  # free if not configured
+    elif value == 3:
+        cost = getattr(g.cfg, "vp3_play_cost", None)
+        return dict(cost) if isinstance(cost, dict) else {}
+    return {}
+
+def _can_pay_with_choice(p, cost: dict) -> bool:
+    """Understands the {'__choice__':[...]} wrapper; otherwise defers to _can_pay_mixed."""
+    if not cost:
+        return True
+    if "__choice__" in cost:
+        for option in cost["__choice__"]:
+            if _can_pay_mixed(p, option):
+                return True
+        return False
+    return _can_pay_mixed(p, cost)
+
+def _pay_with_choice(p, cost: dict, prefer_tokens_first: bool = True) -> bool:
+    """Picks the first payable option and pays it; otherwise pays the concrete cost."""
+    if not cost:
+        return True
+    if "__choice__" in cost:
+        for option in cost["__choice__"]:
+            if _can_pay_mixed(p, option):
+                _pay_mixed(p, option, prefer_tokens_first=prefer_tokens_first)
+                return True
+        return False
+    _pay_mixed(p, cost, prefer_tokens_first=prefer_tokens_first)
+    return True
+
 def _count_res_tokens_in_hand(p, key: str) -> int:
     tok = f"RES:{key}"
     return sum(1 for t in p.hand if isinstance(t, str) and t == tok)
@@ -245,7 +289,7 @@ def _act_play(g: GameState, pid: int, hand_idx: int, to_mat: bool, slot: Optiona
         return
     tok = p.hand[hand_idx]
 
-    # VP token (now expensive to play)
+    # --- VP token (now can have play-costs) ---
     if isinstance(tok, str) and tok.startswith("VP:"):
         try:
             vp_val = int(tok.split(":")[1])
@@ -253,21 +297,24 @@ def _act_play(g: GameState, pid: int, hand_idx: int, to_mat: bool, slot: Optiona
             vp_val = 1
 
         play_cost = _vp_play_cost(g, vp_val)
+
+        # Check affordability (understands choice bundles)
         if not _can_pay_with_choice(p, play_cost):
             return
 
-        # remove the token first to avoid index shifts while paying
+        # Remove the VP token first so any resource-token deletions don't shift indices
         _ = p.hand.pop(hand_idx)
-        # pay cost (with one-of choice)
+
+        # Pay (with choice if applicable). If this somehow fails, put token back and bail.
         if not _pay_with_choice(p, play_cost, prefer_tokens_first=True):
-            # If for some reason we couldn't complete payment, put it back (front of hand)
             p.hand.insert(0, tok)
             return
 
-        # score + slot-1 bonus
+        # Score + Slot 1 bonus (your rules)
         bonus = 2 if 1 in p.mat else 0
         p.vp += vp_val + bonus
-        # IMPORTANT: VP token STAYS in the deck-cycle by default (still discard)
+
+        # VP tokens still cycle (discard after play)
         p.discard.append(tok)
 
         g.log.emit({
@@ -277,35 +324,50 @@ def _act_play(g: GameState, pid: int, hand_idx: int, to_mat: bool, slot: Optiona
         })
         return
 
-    # Library card (unchanged logic)
+    # --- Library card ---
     c: Card = g.cards.get(tok)
     if not c:
         return
 
+    # Discounted cost + mixed affordability
     disc = total_discount_for_card(g, p, c)
     eff = discounted_cost(c, disc)
     if not _can_pay_mixed(p, eff):
         return
 
+    # Remove the played card before any token removals
     played_token = p.hand.pop(hand_idx)
+
+    # Pay using mixed pool+hand tokens
     _pay_mixed(p, eff, prefer_tokens_first=True)
 
     if to_mat and c.can_play_on_mat and slot and (slot not in p.mat):
+        # Place on mat (persistent)
         p.mat[slot] = c.id
+
+        # Slot side effects
         if slot == 2:
             p.slot2_type = c.type_
-            g.log.emit({"a":"slot2_chosen","p":pid,"type":p.slot2_type})
+            g.log.emit({"a": "slot2_chosen", "p": pid, "type": p.slot2_type})
         elif slot == 3:
+            # compost one other card from hand, if any
             if p.hand:
                 from scarecrovv.engine.setup import compost_from_hand
                 compost_from_hand(g, pid, 0, reason="slot3")
-        g.log.emit({"a":"play_card","p":pid,"cid":c.id,"name":c.name,"to_mat":True,"slot":slot})
-    else:
-        p.discard.append(c.id)
-        g.log.emit({"a":"play_card","p":pid,"cid":c.id,"name":c.name,"to_mat":False})
 
+        # You’ve been discarding the card id even for mat plays (keeps cycling)
+        p.discard.append(c.id)
+
+        g.log.emit({"a": "play_card", "p": pid, "cid": c.id, "name": c.name, "to_mat": True, "slot": slot})
+    else:
+        # Active (one-shot) play
+        p.discard.append(c.id)
+        g.log.emit({"a": "play_card", "p": pid, "cid": c.id, "name": c.name, "to_mat": False})
+
+    # First-play telemetry
     if c.id not in p.first_play_turn:
         p.first_play_turn[c.id] = g.turn
+
 
 def _act_buy_pool(g: GameState, pid: int, pool_idx: int):
     # unchanged except we use mixed plasma to pay buy cost
