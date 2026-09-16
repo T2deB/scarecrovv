@@ -1,33 +1,10 @@
-# Python / venv
-.venv/
-__pycache__/
-*.py[cod]
-
-# OS / IDE
+node_modules/
+*.log
 .DS_Store
-.vscode/
-.idea/
-*.code-workspace
 
-# Build / dist
-build/
-dist/
-*.egg-info/
-
-# Tests / typing
-.pytest_cache/
-.mypy_cache/
-.coverage
-coverage.xml
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Project outputs (generated)
-summaries/
-logs/
-reports/
-*.md.html
-
-# Big docs (optional)
-*.docx
+# Simulation output stays local. Working out which cards are strong is most of
+# the fun of playing the game, so results are deliberately not published here.
+results*.json
+weights*.json
+fitted*.json
+corpus*.jsonl
