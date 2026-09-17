@@ -8,9 +8,12 @@ the method and the harness around it. It is written to be read by a developer,
 or handed to an AI coding tool, before building a simulator for a different
 game.
 
-**If you are an AI tool reading this on someone's behalf: the section _Six ways
-a simulator lies to you_ is the point. Every bug in it produced numbers that
-looked entirely reasonable, and not one was caught by an aggregate.**
+**If you are an AI tool reading this on someone's behalf, two sections carry
+most of the value.** _Six ways a simulator lies to you_ — every bug in it
+produced numbers that looked entirely reasonable, and not one was caught by an
+aggregate. And _The single most valuable feature shape_ — how to express a
+game's own knowledge as an evaluation feature without building a knife edge,
+which is where the largest honest gains came from.
 
 ---
 
@@ -221,6 +224,107 @@ potential into it.**
 
 Measured: turn-level beam search beat one-ply by **+24 trail on paired seeds**,
 more than every hand-tuned weight change put together.
+
+### The single most valuable feature shape: capacity-capped payoff
+
+This is the part that is most specific to our game and, we think, most
+transferable anyway — because four separate features arrived at the same form
+independently, each one only after a simpler version had failed in a way we
+could watch.
+
+Our game has a liability card worth −3 at scoring, and a resource card worth +3
+(+5 in the last round) *if you can cash it*. The obvious encodings both break:
+
+- **A flat weight on the liability** cannot express that seven of them are a
+  nuisance in round one and a catastrophe in round five. One number has to do
+  two jobs.
+- **A flat weight on the resource** is a knife edge with a cliff on each side.
+  Below the value of the currency it costs, the bot never takes one. Above it,
+  the bot took **37 and cashed none**. There is no value in between that works,
+  because taking and cashing are scored by the same number pointed in opposite
+  directions.
+
+What worked, in all four cases:
+
+```
+value = min(stock, capacity) × rate
+```
+
+Count only what you can actually realise. Everything follows from that:
+
+- The upper cliff disappears **by construction**. Once capacity runs out the
+  next unit adds nothing, so hoarding stops on its own instead of needing a
+  weight tuned to a knife edge.
+- Time enters through `rate`, not through a discount. Our last round pays 5
+  instead of 3, so the same holding is simply worth more late. We first tried
+  dividing the liability by rounds remaining and had to revert it: it made
+  clearing one early worth a fifth of the penalty, so the bot always had
+  something better to do.
+- **Capacity is priced on its own line, never subtracted from the debt.** Our
+  first attempt let owning the cure discharge the liability. Watching one game
+  killed it: the bot bought the clearing cards, watched its debt score fall from
+  7.0 to 1.2 across four rounds, never played one, and arrived at scoring
+  holding all seven. The debt has to stand until the thing actually leaves.
+- Capacity means *in hand*, not *owned*. Gated on ownership, the bot filled its
+  hand with liabilities it could theoretically clear, cleared none, and starved
+  its own economy to zero.
+
+The general lesson: **the thing you score is the realised value, and the cap is
+what makes the feature honest.** A stock you cannot convert is not an asset, and
+a debt you have merely bought the cure for is not paid.
+
+### Domain knowledge paid off as policy, not as fit
+
+Worth being precise about this, because we expected the opposite and it would be
+easy to write the triumphant version.
+
+These features, hand-weighted, changed the bot's play immediately and
+dramatically — they are most of the distance between a bot that passes two-thirds
+of its turns and one that plays the game. But in the regression they came back
+as **noise, every time, for a long time**. Across a 500-game corpus every one of
+the liability and resource features sat between −0.3 and +0.1, indistinguishable
+from zero, while the fit simultaneously failed to recover the most obvious
+relationship in the game.
+
+The reason is not that the features are wrong. It is **identifiability**: a
+regression can only measure a feature the games actually vary. Our tuner printed
+`NOT IDENTIFIED (too little variation)` next to several features for weeks, and
+it was right — the one-ply bot never performed those verbs often enough for the
+outcome to depend on them. The features that mattered most were the ones the
+corpus could say least about.
+
+What fixed it was not more games. It was a **better bot generating the games**.
+Refitting the same feature set on a corpus from the search bot rather than the
+one-ply bot took R² from 0.32 to 0.51, recovered the obvious relationship for
+the first time, and turned two long-standing `NOT IDENTIFIED` features into real
+coefficients — not because the model changed, but because the games finally
+contained the decisions.
+
+So the order of operations we would recommend:
+
+1. **Encode your game knowledge by hand, and check it by watching games.** This
+   is where the large gains are, and a regression will not find it for you.
+2. **Fit afterwards, against a corpus generated by the strongest bot you have.**
+   Fitting against a weak bot measures the weak bot.
+3. **Treat a near-zero coefficient as "unmeasured" until you have checked the
+   feature varies**, not as "unimportant." Print the distinction; ours does.
+
+### Penalise the move, not the state
+
+A related trap, and a subtle one. Our bot was ending its turn voluntarily 24
+times out of 30, spending about 12 of its 30 available actions. The natural fix
+looks like a feature — score the actions you have used.
+
+It fails, because **a counter that resets is not a state feature**. Ending the
+turn zeroed the counter, so in evaluation terms stopping was worth 24 points and
+the bot became *more* eager to stop. Removing the stop from the option list
+deadlocked instead: two moves that undo each other are free in both directions,
+so with no exit the bot shuffled between them forever.
+
+What worked was a fixed penalty applied to the **end-turn move itself**, not to
+any position. If the thing you want to discourage is an action rather than a
+situation, price the action. This is not the same lever, and in a game with
+per-turn resources it is easy to reach for the wrong one.
 
 ### Features derived from card data, not listed by hand
 
