@@ -164,6 +164,12 @@ The same mistake, twice more:
 
 ## What actually worked
 
+Roughly three groups. **Tools** — watching one game, paired seeds, a conformance
+test — are what stopped us believing wrong numbers. **Architecture** — what
+search does versus what evaluation does — is where the largest single measured
+gain came from. **Expressing your game's own knowledge as features** is the rest
+of it, and the part no general-purpose advice will give you.
+
 ### Watch one game before you trust a thousand
 
 This is the single highest-value habit we found. Every bug above was found by
@@ -325,6 +331,114 @@ What worked was a fixed penalty applied to the **end-turn move itself**, not to
 any position. If the thing you want to discourage is an action rather than a
 situation, price the action. This is not the same lever, and in a game with
 per-turn resources it is easy to reach for the wrong one.
+
+### Measure the shape of your game before you borrow a prior
+
+Section 6 above is the failure. This is the procedure that should have come
+first, and it costs almost nothing.
+
+Take any corpus of finished games — it does not need a good bot, only completed
+ones — and correlate **each player's score lead at the end of each phase with
+their final margin**. Plot it across the game. That single curve tells you what
+kind of game you have:
+
+- **Flat and high from the start:** position accumulates. A lead now is a lead
+  later. Chess-like, and most engine intuition transfers.
+- **Rising steeply, near zero early:** back-loaded. Most of the result is
+  decided late, and early score is close to meaningless. Ours climbs
+  `0.10 → 0.53`.
+- **Falling:** something is rubber-banding, deliberately or otherwise. Worth
+  knowing either way.
+
+Three things follow from it:
+
+1. **It calibrates your sanity checks.** Ours demanded that a point now predict
+   a point of final margin. In a back-loaded game that is simply false, and the
+   check rejected three valid fits before we questioned it.
+2. **It sets your expectations for phase tapering** (below). If the curve is
+   steep, early and late weights *should* differ a lot, and a fit that returns
+   them nearly equal is suspicious.
+3. **It is a design read-out.** A curve this steep means the last round carries
+   the game. That is a legitimate design — ours is deliberately a payoff game —
+   but it is worth confirming that the shape you measure is the shape you
+   intended, because nothing else in the pipeline will tell you.
+
+Run this before you tune anything. It is twenty lines and it is the only thing
+we built that told us about the *game* rather than about the bot.
+
+### Phase tapering, and using the fit as a test of your design intent
+
+Once you know the game has phases, one weight per feature is not enough. The
+standard trick, borrowed from chess and worth borrowing:
+
+```
+E = (1 − p) · x · W_early  +  p · x · W_late
+```
+
+where `p` runs 0 to 1 across the game. Fit both vectors at once; the feature is
+free to matter more at one end.
+
+The part worth stealing is not the formula, it is what you do with it. **You
+already believe things about how your game's phases differ.** Ours was "buy
+early, play late" — spend actions acquiring in the opening, converting in the
+endgame. That is a hypothesis, and tapering turns it into a testable one: print
+each feature's early and late weight side by side with whether it rose or fell,
+and read off whether the fit agrees with the designer.
+
+Ours half-agreed. The features representing *acquisition capacity* fell from
+early to late, exactly as intended. But the raw count of things owned came back
+flat and very slightly negative in both phases — no support at all for the
+belief that accumulating is good.
+
+Two honest readings, and we could not separate them:
+
+- The belief is wrong, or wrong as stated.
+- The belief is right but the credit is going elsewhere. Correlated predictors
+  do this routinely: if a stronger feature captures *what the acquisitions were
+  for*, the raw count has nothing left to explain.
+
+We report it as unresolved rather than as a finding. That is the right response
+to a coefficient you cannot interpret, and it is worth saying out loud because
+the temptation is to pick whichever reading flatters the design.
+
+One cost to know about: tapering **doubles your parameter count**. With
+clustered observations — where a whole game supplies one real outcome no matter
+how many positions you record — that is expensive. Ridge regularisation and an
+honest count of your effective sample size are not optional here.
+
+### Encode the constraint you already know
+
+The designer has played the game hundreds of times. That is data, it is free,
+and it is often about exactly the decisions a weak bot never varies enough for a
+regression to measure.
+
+Our case: across every real game, declining to use an available action had been
+correct **once** — a specific opening situation where the only acquisition on
+offer would have added two liabilities to an empty deck. So "spend every action"
+is not a weight to be discovered. It is a fact the designer already holds, and
+the bot was violating it 24 turns out of 30.
+
+How to encode it matters, and two of the three ways fail:
+
+- **As a feature** — score the actions used. Fails; see *Penalise the move, not
+  the state* above.
+- **As a hard constraint** — remove the option. Fails: it deadlocked, because
+  with no exit the bot cycled between two moves that undo each other.
+- **As a penalty on the move**, large enough to dominate ordinary play but
+  finite. Works, and it is the right shape for a different reason: **the one
+  genuine exception can still win.** A search that finds the opening position
+  where passing really is correct can pay the penalty and pass.
+
+The general form: **a soft prior, sized to your confidence, applied where the
+decision is made.** Not a hard rule, because your experience has exceptions and
+you may not have enumerated them. Not a fitted weight, because the fit can only
+find what the corpus varies, and if the bot is doing the wrong thing 80% of the
+time the corpus does not contain the alternative.
+
+The obvious danger is baking in a wrong belief, and a simulator will happily
+confirm whatever you assert. Two guards, both cheap: **write the exception down
+next to the penalty** — ours is a comment naming the exact opening case — and
+**keep it soft**, so that when the game disagrees with you, it can say so.
 
 ### Features derived from card data, not listed by hand
 
