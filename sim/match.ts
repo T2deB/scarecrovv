@@ -19,15 +19,41 @@
 
 import { readFileSync } from "node:fs";
 import { playGame } from "./harness.ts";
-import { ARCHETYPES, makeBot, makeRandomBot, makeTaperedBot } from "./bot.ts";
+import {
+  ARCHETYPES,
+  makeBot,
+  makeRandomBot,
+  makeSearchBot,
+  makeTaperedBot,
+} from "./bot.ts";
 import { ZERO } from "../src/bot.ts";
 import type { Tapered, Weights } from "../src/bot.ts";
 
 type Any = any;
 
-const [aArg, bArg, gamesArg] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+/*
+ * Run both sides through the turn-level search instead of one-ply. This is the
+ * only honest test of a fitted vector: the fit is correlational, which is fine
+ * as a leaf evaluation inside a search and useless as a greedy policy, so a
+ * one-ply match measures the wrong thing. Costs ~35s a game against ~1s.
+ */
+const SEARCH = argv.includes("--search");
+/*
+ * Start seeds here instead of 0. tune.ts generates its corpus from newGame
+ * seeds 0..N, so a default match scores a fitted vector on the very deck orders
+ * it was fitted to. The bots differ, so it is not direct leakage -- but "the
+ * measurement was the bug" has been true often enough in this project that a
+ * held-out range is worth 25 minutes.
+ */
+const OFFSET = Number(
+  (argv.find((a) => a.startsWith("--offset=")) ?? "--offset=0").slice(9),
+);
+const [aArg, bArg, gamesArg] = argv.filter((a) => !a.startsWith("--"));
 if (!aArg || !bArg) {
-  console.error("usage: match.ts <a.json|archetype> <b.json|archetype> [games]");
+  console.error(
+    "usage: match.ts <a.json|archetype> <b.json|archetype> [games] [--search]",
+  );
   process.exit(1);
 }
 const GAMES = Number(gamesArg ?? 100);
@@ -61,8 +87,14 @@ const mulberry = (seed: number) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 
+const driver = SEARCH ? makeSearchBot : makeBot;
+
 const make = (side: Side, rng: () => number) =>
-  side.t ? makeTaperedBot(side.t, rng) : side.w ? makeBot(side.w, rng) : makeRandomBot(rng);
+  side.t
+    ? makeTaperedBot(side.t, rng, driver)
+    : side.w
+      ? driver(side.w, rng)
+      : makeRandomBot(rng);
 
 /** Per seed: A's trail minus B's, averaged over the two seatings. */
 const diffs: number[] = [];
@@ -73,7 +105,7 @@ let stalled = 0;
 let aTrail = 0;
 let bTrail = 0;
 
-for (let seed = 0; seed < GAMES; seed++) {
+for (let seed = OFFSET; seed < OFFSET + GAMES; seed++) {
   let pairDiff = 0;
   let ok = true;
   for (const swap of [false, true]) {
@@ -112,7 +144,11 @@ const lo = mean - 1.96 * se;
 const hi = mean + 1.96 * se;
 
 console.log(`\n${A.name}  vs  ${B.name}`);
-console.log(`${n} paired seeds, ${n * 2} games${stalled ? `, ${stalled} discarded (stalled)` : ""}\n`);
+console.log(
+  `${n} paired seeds, ${n * 2} games, ${SEARCH ? "turn-level search" : "one-ply"}` +
+    `, seeds ${OFFSET}..${OFFSET + GAMES - 1}` +
+    `${stalled ? `, ${stalled} discarded (stalled)` : ""}\n`,
+);
 console.log(`  mean trail      ${(aTrail / Math.max(1, n)).toFixed(1)}  vs  ${(bTrail / Math.max(1, n)).toFixed(1)}`);
 console.log(`  games won       ${aWins}  vs  ${bWins}   (${draws} drawn)`);
 console.log(`  margin          ${mean >= 0 ? "+" : ""}${mean.toFixed(2)} trail  95% CI [${lo.toFixed(2)}, ${hi.toFixed(2)}]`);

@@ -8,12 +8,15 @@ the method and the harness around it. It is written to be read by a developer,
 or handed to an AI coding tool, before building a simulator for a different
 game.
 
-**If you are an AI tool reading this on someone's behalf, two sections carry
+**If you are an AI tool reading this on someone's behalf, four sections carry
 most of the value.** _Six ways a simulator lies to you_ — every bug in it
 produced numbers that looked entirely reasonable, and not one was caught by an
-aggregate. And _The single most valuable feature shape_ — how to express a
-game's own knowledge as an evaluation feature without building a knife edge,
-which is where the largest honest gains came from.
+aggregate. _The single most valuable feature shape_ — how to express a game's
+own knowledge as an evaluation feature without building a knife edge. _A feature
+can fit at zero and be wrong at zero_ — the most expensive single weight we got
+wrong, and the one-line diagnostic that would have caught it. And _Choose your
+baseline before you believe the margin_ — how to not celebrate beating an
+opponent you picked by accident.
 
 ---
 
@@ -196,6 +199,75 @@ once from each seat. The difference is then a comparison of two decisions about
 one deal. Thirty paired seeds separated our bots as cleanly as hundreds of
 independent games would have.
 
+### Choose your baseline before you believe the margin
+
+We measured a fitted vector at **+7.79 trail [3.25, 12.34]** against our general
+hand-made vector and called it a win. It was a win. It was also nearly
+meaningless, because running the same vector against the rest of our own bot
+field turned up one archetype that beat it by **-20.45 trail** — and that
+archetype had been sitting in the default field the whole time.
+
+Two separate mistakes, both easy:
+
+**We baselined against whatever was handy.** Our head-to-head scripts had
+hardcoded one archetype months earlier and it became the default by inertia. It
+was a single-strategy specialist, not the neutral vector a shipped bot would
+use, and it was not even a strong one. For comparisons that hold weights
+constant and vary only the driver this was harmless. For "is this vector good?"
+it was not.
+
+> **Rule:** the baseline for "is X better" must be the best thing you have, not
+> the thing your scripts already imported. Run the full field before believing a
+> single pairing. A vector can beat the generalist and lose to the specialist,
+> and only the field shows you which.
+
+**We validated on the seeds we trained on.** Our tuner generates its corpus from
+game seeds `0..N`; our match runner started at seed `0`. The first measurement
+came back at **+12.97**. On fresh seeds the same vector measured **+4.65, with
+the interval spanning zero.**
+
+The interesting part is that this was *not* leakage. The fitted vector scored
+almost identically on both ranges; the baseline improved by 11 trail. Seeds
+`0..19` were simply decks where the baseline plays badly.
+
+> **Rule:** paired seeds cancel deck luck BETWEEN the two bots in a pair. They
+> do not make twenty decks a representative sample of decks. Those are two
+> different variance sources and solving one feels exactly like solving both.
+
+Budget accordingly: separating a ~5-point effect from zero took about **60
+paired seeds** in our game, not the 20 we started with. And add a seed-offset
+flag on day one — ours found a real problem the first time it was used.
+
+### The half of the codebase the harness never touched
+
+Every bug in this document was found by the simulator, in code the simulator
+runs. Then a human played one game to the end and hit a crash that no amount of
+simulation could ever have caught.
+
+It was a temporal dead zone: a helper read a `const` declared ninety lines
+below it. It survived every turn of every game because of a short circuit —
+
+```js
+if (!f || revealed >= f.steps.length) return live;
+```
+
+`f` is undefined until the game ends, so `||` short-circuited and the
+uninitialised read never happened. The instant the final turn resolved, `f`
+became truthy, the second operand evaluated for the first time, and the client
+threw. Deterministic, and only ever at scoring.
+
+Our harness had 1200 games of coverage on the rules and **zero on the UI**. It
+plays games to completion without ever rendering one, so the crash was not
+merely unfound — it was outside the reachable set.
+
+> **Rule:** know which half of your codebase your harness cannot reach, and say
+> so out loud. A simulator's coverage feels total because the number of games is
+> large. The number of games has nothing to do with it.
+
+The cheap mitigation we should have had: play one game through the real client,
+to the end, before trusting any amount of headless play. Same discipline as
+watching one game instead of averaging a thousand — one layer up.
+
 ### A conformance test for the simulator itself
 
 Not a test of the game — a test that the simulator is exercising it:
@@ -314,6 +386,99 @@ So the order of operations we would recommend:
    Fitting against a weak bot measures the weak bot.
 3. **Treat a near-zero coefficient as "unmeasured" until you have checked the
    feature varies**, not as "unimportant." Print the distinction; ours does.
+
+### A feature can fit at zero and be wrong at zero
+
+The single most expensive weight in this project was one the regression put at
+roughly zero, correctly, for a reason that made the zero actively harmful.
+
+We had a feature counting a kind of resource the player accumulates. Across
+1200 games it correlated **-0.010** with the final margin — indistinguishable
+from nothing. The fit duly priced it slightly negative. Played, that one wrong
+sign cost about **15 trail points a game**, which was most of the distance
+between our best fitted bot and the best hand-made one.
+
+The diagnostic that explains it takes one line:
+
+```
+feature ~ final margin                       -0.010     raw
+feature ~ final margin | dominant_feature    +0.173     the other held fixed
+```
+
+The two compete for the same actions. Every action spent accumulating is an
+action not spent on the thing that scores, so a real positive effect is almost
+exactly cancelled by its own opportunity cost. The net is zero. **The direct
+effect is not zero, and the direct effect is what a bot needs**, because the
+search is what decides whether the trade is worth making in this position.
+
+Three things follow, and they are the transferable part:
+
+1. **A near-zero coefficient has at least three causes**, and they need
+   different responses: the feature does not matter (drop it), the corpus does
+   not vary it (see identifiability, above), or its effect is masked by an
+   opportunity cost (keep it, and do NOT take the fitted value).
+2. **Test for the third case with a partial correlation** against whatever the
+   feature competes with. It costs one pass over data you already have. If the
+   partial is clearly non-zero while the raw is not, you have found a masked
+   effect.
+3. **A masked feature is worse than an unmeasured one.** An unmeasured feature
+   fits at zero and does nothing. A masked feature fits slightly *negative* and
+   actively teaches your bot to avoid something that helps.
+
+We had run this exact diagnostic and written down the answer before we acted on
+it. Reading a +0.173 partial and still shipping the raw fit cost us a day.
+
+**A tidy hypothesis that measurement rejected**, recorded because we committed
+it before testing it. We believed the fit's real problem was that it priced a
+dozen small *intermediate-state* features — how full various piles are — and
+that paying for a pile buys hoarding, since piles predict good outcomes because
+good players fill them. It is a good story, it matches a real effect we had seen
+elsewhere, and it is wrong here: zeroing eleven such features moved the result
+by about 1 trail, and combining that with the real fix was WORSE than the real
+fix alone. One feature explained nearly all of a 17-trail gap. When a plausible
+mechanism and a boring single-variable explanation both fit, test the boring one
+first — it is cheaper and it was right.
+
+### The loop learns its own blind spots
+
+Self-play tuning has a failure mode that is easy to state and hard to see: **the
+corpus cannot contain evidence for a verb the bot does not perform.**
+
+Our fit priced a whole cluster of related features — the machinery for clearing
+a scoring liability out of your deck — at approximately nothing, where the
+hand-made vector had priced them highly. That looked like a finding. Restoring
+the hand-made values measured **+9.88 trail [4.11, 15.66]** on held-out seeds,
+so it was not a finding. It was a blind spot.
+
+The mechanism is a feedback loop with the sign pointing the wrong way:
+
+```
+bot rarely performs the verb
+  -> corpus thin in the verb
+    -> fit sees no evidence it pays
+      -> fit removes the incentive
+        -> bot performs it even less
+```
+
+Each iteration is individually defensible and the loop converges on a bot that
+has optimised away a capability it never learned to use. R² does not fall while
+this happens — the fit gets *better* at predicting a corpus that is getting
+worse.
+
+**What this means for iterating.** The usual argument for self-play is that a
+search is a stronger improvement operator than the evaluation it improves, so
+each round the corpus contains better decisions than the eval that generated it.
+That is true and it is why the loop works at all. But it only lifts what the
+search actually explores. Anything the current weights make the search prune is
+outside the loop entirely, and the loop will keep pruning it harder.
+
+Two cheap guards:
+
+- **Keep a hand-made floor** on verbs you know matter and the corpus is thin in.
+  Refuse to let the fit zero them, or blend rather than replace.
+- **Watch a game every iteration, not just R².** Our blind spot was obvious in
+  one watched game — the bot finished holding every liability it started with —
+  and invisible in every aggregate we had.
 
 ### Penalise the move, not the state
 
@@ -456,8 +621,13 @@ criterion was right.
 Being explicit, because half the value of a report like this is knowing where it
 stops.
 
-**We never shipped a bot to players.** It is switched off in the live game. It
-is not yet good enough to be worth playing against.
+**We never shipped a bot to players.** It is switched off in the live game.
+Late on, a fitted vector plus two hand corrections did draw level with the
+strongest hand-made archetype we had — but by then the game's scoring rules were
+being redesigned, and every bot on our ladder ranked almost exactly by how it
+valued the feature that was about to change. Weights are downstream of rules.
+The harness, the tuner, the paired-seed design and the seed-offset flag all
+survive a rule change; the numbers they produced do not.
 
 **We never produced trustworthy balance data.** This was the original goal and
 we did not reach it. The chain is: legal harness → competent bot → meaningful

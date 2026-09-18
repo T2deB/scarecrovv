@@ -17,10 +17,16 @@ const mulberry = (seed: number) => () => {
   t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
-const w = ARCHETYPES.rotting;
+/*
+ * The general hand-made vector, not a single-domain archetype. This comparison
+ * holds weights constant and varies only the DRIVER, so the choice barely
+ * mattered -- but reading "weights = base" invited the wrong conclusion
+ * about which bot the result describes.
+ */
+const w = ARCHETYPES.base;
 const SEEDS = Number(process.argv[2] ?? 8);
 
-console.log(`beam configs vs one-ply, ${SEEDS} paired seeds each, weights = rotting\n`);
+console.log(`beam configs vs one-ply, ${SEEDS} paired seeds each, weights = base\n`);
 console.log("width depth   margin      95% CI            s/game   stalled");
 for (const [width, depth] of [[8, 8], [6, 8], [4, 8], [8, 6], [12, 8], [6, 10]] as const) {
   const diffs: number[] = [];

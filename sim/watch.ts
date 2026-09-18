@@ -15,10 +15,17 @@
  */
 
 import { legalActions, newGame, toEngineAction, type Available } from "./harness.ts";
-import { ARCHETYPES, makeBot, makeRandomBot, makeSearchBot } from "./bot.ts";
+import {
+  ARCHETYPES,
+  makeBot,
+  makeRandomBot,
+  makeSearchBot,
+  makeTaperedBot,
+} from "./bot.ts";
 import { getAvailableActions, applyActions, isGameOver } from "../src/game.ts";
 import { cardByKey } from "../src/cards.ts";
-import { features } from "../src/bot.ts";
+import { features, ZERO } from "../src/bot.ts";
+import { readFileSync } from "node:fs";
 
 type Any = any;
 const args = process.argv.slice(2);
@@ -35,6 +42,16 @@ const mulberry = (seed: number) => () => {
 };
 
 const make = (name: string, rng: () => number) => {
+  /*
+   * A fitted vector, run the way it would ship: tapered, inside the search.
+   * Diagnosing what the BOT actually does wrong needs the real bot, and until
+   * now this tool could only watch archetypes.
+   */
+  if (name.endsWith(".json")) {
+    const raw = JSON.parse(readFileSync(name, "utf8")) as Any;
+    const t = { early: { ...ZERO, ...raw.early }, late: { ...ZERO, ...raw.late } };
+    return makeTaperedBot(t, rng, makeSearchBot);
+  }
   if (name === "random") return makeRandomBot(rng);
   if (name === "search") return makeSearchBot(ARCHETYPES.rotting, rng, 8, 8);
   if (name === "search-lowrih")
@@ -53,8 +70,9 @@ const make = (name: string, rng: () => number) => {
 
 const rng = mulberry(SEED);
 const st = newGame([1, 2], SEED);
-const bots: Any = { 1: make(WHICH, rng), 2: make("rotting", rng) };
-console.log(`P1 = ${WHICH}   P2 = rotting   seed ${SEED}\n`);
+const OPP = args.filter((a) => !a.startsWith("--"))[2] ?? "base";
+const bots: Any = { 1: make(WHICH, rng), 2: make(OPP, rng) };
+console.log(`P1 = ${WHICH}   P2 = ${OPP}   seed ${SEED}\n`);
 
 let steps = 0;
 let lastKey = "";

@@ -381,17 +381,32 @@ export const makeSearchBot = (
  * Late it is about cashing what you built, at the Hollow Echo's rate of 5 a
  * Remnant. One vector cannot say both, which is what the tapered fit is for.
  */
-export const makeTaperedBot = (t: Tapered, rng: () => number): Chooser => {
+export const makeTaperedBot = (
+  t: Tapered,
+  rng: () => number,
+  /*
+   * How to build the driver the blended weights feed. Defaults to one-ply, but
+   * a fitted vector has to be testable the way it would SHIP -- as the leaf
+   * evaluation inside the search -- and testing it one-ply instead answers a
+   * question we already know the answer to (0 of 120 games). Pass makeSearchBot
+   * here, not a separate tapered-search bot, so both sides of a match run
+   * through identical code.
+   */
+  driver: (w: Weights, rng: () => number) => Chooser = makeBot,
+): Chooser => {
   const inner = new Map<string, Chooser>();
   return (state, playerId, options) => {
-    // Round to a tenth so a handful of blended bots are reused rather than one
-    // rebuilt per decision; the per-bot state (the repetition set) is keyed on
-    // the turn anyway.
+    /*
+     * Round to a tenth so a handful of blended bots are reused rather than one
+     * rebuilt per decision. phaseOf reads only the round, so a bucket is a whole
+     * round and can never split a turn -- which matters more for a search
+     * driver, whose repetition set is per-bot and keyed on the turn.
+     */
     const p = Math.round(phaseOf(state as Any, playerId) * 10) / 10;
     const key = `${playerId}:${p}`;
     let bot = inner.get(key);
     if (!bot) {
-      bot = makeBot(blend(t, p), rng);
+      bot = driver(blend(t, p), rng);
       inner.set(key, bot);
     }
     return bot(state, playerId, options);
@@ -495,6 +510,14 @@ const aw = (over: Partial<Weights>): Weights => ({ ...ANIMAL_BASE, ...over });
 
 export const ARCHETYPES: Record<string, Weights> = {
   // --- baselines ---------------------------------------------------------
+  /*
+   * BASE with nothing layered on it: the general hand-made vector, and the one
+   * a shipped bot would actually use. Every other entry here is BASE plus a
+   * strategic bias, so THIS is the reference a fitted vector has to beat --
+   * beating a single-domain specialist says as much about that domain as it
+   * does about the fit.
+   */
+  base: w({}),
   greedy: w({ souls: 4 }),
   "remnant-rush": w({ remnantsInHand: 5, trail: 12 }),
   thinner: w({ consumed: 2.5, deckSize: -0.8, corruptedLive: -3 }),
