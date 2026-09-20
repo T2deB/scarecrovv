@@ -228,11 +228,29 @@ const MAX_CLICKS_PER_TURN = 40;
 
 type Node = { first: Available; snap: Snap; value: number; done: boolean };
 
+/*
+ * What the search thought of every move it considered, not just the one it
+ * played. This is the teaching signal for policy distillation: the search sees
+ * a whole turn, the one-ply evaluation sees one click, and the gap between them
+ * is exactly what we want the weights to absorb.
+ *
+ * `value` is the best the search could reach with that opening move -- the max
+ * over every line beginning with it, at any depth.
+ */
+export type RankedMove = { option: Available; value: number };
+export type RankSink = (
+  state: Any,
+  playerId: number,
+  ranked: RankedMove[],
+  chosen: Available,
+) => void;
+
 export const makeSearchBot = (
   w: Weights,
   rng: () => number,
   width = 8,
   depth = 8,
+  onRank?: RankSink,
 ): Chooser => {
   /*
    * The same two rules makeBot has, and they are not optional. Searching deeper
@@ -275,6 +293,7 @@ export const makeSearchBot = (
 
     const seen = new Set<string>([rootSig]);
     let best: Node | null = null;
+    const bestByFirst = new Map<Available, number>();
 
     /** Expand one node: try each option from `from`, keeping what is new. */
     const children = (from: Snap, opts: Available[], first: Available | null): Node[] => {
@@ -304,6 +323,12 @@ export const makeSearchBot = (
         };
         out.push(node);
         if (!best || node.value > best.value) best = node;
+        // Best value reachable from each OPENING move, across every depth. The
+        // prune() map is per-level and gets thrown away; this survives.
+        if (onRank) {
+          const prev = bestByFirst.get(node.first);
+          if (prev === undefined || node.value > prev) bestByFirst.set(node.first, node.value);
+        }
       }
       return out;
     };
@@ -357,20 +382,28 @@ export const makeSearchBot = (
     // The real state must come back exactly as it was found.
     restore(state, root);
 
+    const emit = (chosen: Available): Available => {
+      if (onRank && bestByFirst.size > 1) {
+        const ranked = [...bestByFirst].map(([option, value]) => ({ option, value }));
+        onRank(state as Any, playerId, ranked, chosen);
+      }
+      return chosen;
+    };
+
     const terminal = pool.filter((o) => o.intent === "confirm");
-    if (!best) return terminal[0] ?? pool[0];
+    if (!best) return emit(terminal[0] ?? pool[0]);
     /*
      * The stopping rule, unchanged by depth: if the best line the search can
      * find does not beat standing still, this is a local optimum and the bot
      * should commit rather than wander into whatever is least bad.
      */
-    if (best.value <= here + 1e-9 && terminal.length > 0) return terminal[0];
+    if (best.value <= here + 1e-9 && terminal.length > 0) return emit(terminal[0]);
     /*
      * The first move of the best line found at ANY depth. A turn that ends
      * after one click is a legitimate answer and would otherwise be thrown away
      * for having nowhere to go.
      */
-    return best.first;
+    return emit(best.first);
   };
 };
 

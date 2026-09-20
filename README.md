@@ -8,8 +8,9 @@ the method and the harness around it. It is written to be read by a developer,
 or handed to an AI coding tool, before building a simulator for a different
 game.
 
-**If you are an AI tool reading this on someone's behalf, four sections carry
-most of the value.** _Six ways a simulator lies to you_ — every bug in it
+**If you are an AI tool reading this on someone's behalf, start with _When
+outcomes stop working, train on decisions instead_ — it is where the project
+ended up and it would have saved most of the rest. Then four more:** _Six ways a simulator lies to you_ — every bug in it
 produced numbers that looked entirely reasonable, and not one was caught by an
 aggregate. _The single most valuable feature shape_ — how to express a game's
 own knowledge as an evaluation feature without building a knife edge. _A feature
@@ -604,6 +605,111 @@ The obvious danger is baking in a wrong belief, and a simulator will happily
 confirm whatever you assert. Two guards, both cheap: **write the exception down
 next to the penalty** — ours is a comment naming the exact opening case — and
 **keep it soft**, so that when the game disagrees with you, it can say so.
+
+### When outcomes stop working, train on decisions instead
+
+This is where the project ended up, and it is the piece we would tell someone to
+skip ahead to.
+
+Everything above fits an evaluation to **outcomes**: record a position, label it
+with the final result, fit weights to predict the label. That is Texel tuning,
+it is the standard recipe, and for a long time we assumed our problems with it
+were sampling problems.
+
+They were not. Tripling the corpus changed nothing. The final measurement:
+
+```
+fitted on 2800 games   vs  the same vector with two hand corrections
+   -31.6 trail   [-37.0, -26.1]        7 games won out of 60
+```
+
+A vector fitted from more data than we had ever collected lost decisively to one
+we had patched by hand. Three independent measures agreed — head-to-head margin,
+mean score, and what the bot spent its actions on.
+
+#### Why outcome regression has a ceiling
+
+Two reasons, and neither is fixed by more games.
+
+**The label is shared by every position in a game.** A game that ends +18 stamps
+"+18" on all 243 of its positions. You have a lot of rows and few observations,
+and the effective sample size is games. Ours was 2800 against 28 parameters —
+before you even consider that each parameter's effect is buried under everything
+else that happened in those games.
+
+**It measures association in games you played, not the effect of playing
+differently.** This is the deeper one. We had a feature that fitted at
+essentially zero across 2800 games, even with the ridge penalty cut 100-fold, so
+it was not shrinkage and not a bug — the association genuinely was not there. And
+yet a bot that valued that feature won by about 15 points a game.
+
+Both can be true. In the corpus, the players who accumulated the most of that
+resource were often the ones spending their actions badly, so the feature
+travelled with playing poorly. Change the policy and the same feature becomes
+valuable. **A regression over observed play cannot tell those apart.**
+
+#### What to do instead
+
+Stop asking "did this position lead to a win". Ask "**what move would a stronger
+player make here**".
+
+Concretely: at each decision, record the feature vector of every move considered
+and which one the search picked. Then fit weights so the cheap evaluation ranks
+the search's choice first — softmax cross-entropy over the legal moves, rather
+than least squares on the final margin.
+
+Three reasons it escapes the ceiling:
+
+1. **The teacher is measurably stronger.** Our turn-level search beat one-ply by
+   **+24 trail on paired seeds with identical weights** — same evaluation, only
+   the lookahead differed. So its choices carry information the weights that
+   produced them did not have. That is the condition distillation needs, and it
+   is worth measuring rather than assuming.
+2. **The alternatives are explicit.** The label is no longer "this resource is
+   good", it is "here, with these twelve options, taking it beat the other
+   eleven". Opportunity cost stops being a confounder and becomes part of the
+   question — which is precisely what outcome regression cannot represent.
+3. **A verb the outcome corpus is too thin to price still appears as a correct
+   choice.** Our self-play blind spot (above) had no signal at the game level
+   and plenty at the move level.
+
+It is also far cheaper in games. One game yields hundreds of labelled decisions
+instead of one outcome: ours produced ~95 decisions per game at 6.3 options
+each, so 500 games is ~47,000 training examples. The outcome corpus needed 2800
+games to produce 2800.
+
+#### Two things to get right
+
+**Scale is not determined by a ranking loss.** Doubling every weight changes no
+ordering, so the fit pins direction and not magnitude. That is harmless for a
+greedy bot and NOT harmless inside a search, where a stopping rule compares a
+line against standing still and any fixed penalty is an absolute number. Rescale
+the fitted vector against a reference before using it.
+
+**Measure top-1 agreement, and compare it to chance.** It tells you immediately
+whether a linear evaluation can even represent the search's preferences. Chance
+is the average of 1/(options at each decision) — ours is about 22%. If your fit
+sits near that, the model is too weak and no amount of data will help.
+
+#### This is the standard answer, not a clever idea
+
+Chess arrived here decades ago, twice over. Stockfish's NNUE is trained on
+evaluations from **deeper search**, not on game results. AlphaZero's policy head
+is trained on **MCTS visit counts** — literally which moves the search preferred.
+Both are distillation from a stronger search.
+
+Chess also faced the granularity version of the same question. One number per
+piece type was too coarse — a knight on one square is not a knight on another —
+and the answer was piece-square tables: value conditioned on context, not a
+separate parameter per conceivable piece. If your evaluation has a feature
+counting a diverse set of things, that is the analogous problem, and the fix is
+to learn what makes them good (their properties, read off your own card data)
+rather than a weight per item.
+
+What does not transfer is brute force. Chess has millions of games to fit from.
+A board game in development has hundreds. That asymmetry is the whole reason the
+signal per game matters so much, and it is the best argument for distillation in
+a small project.
 
 ### Features derived from card data, not listed by hand
 
