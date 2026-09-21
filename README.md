@@ -874,13 +874,43 @@ criterion was right.
 Being explicit, because half the value of a report like this is knowing where it
 stops.
 
-**We never shipped a bot to players.** It is switched off in the live game.
-Late on, a fitted vector plus two hand corrections did draw level with the
-strongest hand-made archetype we had — but by then the game's scoring rules were
-being redesigned, and every bot on our ladder ranked almost exactly by how it
-valued the feature that was about to change. Weights are downstream of rules.
-The harness, the tuner, the paired-seed design and the seed-offset flag all
-survive a rule change; the numbers they produced do not.
+**We never shipped a bot to players.** Late on, a distilled vector drew level
+with the strongest hand-made one we had — and then the scoring rules were
+redesigned, and every bot on our ladder ranked almost exactly by how it valued
+the feature that changed. Weights are downstream of rules. The harness, the
+tuner, the paired-seed design and the seed-offset flag survive a rule change;
+the numbers they produce do not.
+
+**And the weights were never the point.** This is the single most useful thing
+we learned and we learned it far too late. The bot the game actually shipped
+with searched one move ahead. Our measurements had all been made with a
+turn-level search around the same evaluation. When we finally ran the two
+against each other:
+
+```
+  every weight vector we had, one ply        4-6 points
+  the same vectors inside the search        40-60 points
+```
+
+**The search was worth about fifty points and the weights about five.** Months of
+tuning, fitting and distilling moved a number that a few hours of lookahead
+dwarfed. All of it was real — the distilled vector does beat the hand-made one —
+but it was the smaller half by an order of magnitude, and we spent almost all
+our effort there.
+
+The trap is that weights are easy to iterate on and search architecture is not.
+A weight change is a number and a rerun; a search is a design with snapshots, a
+repetition set, pruning and a budget. So the cheap loop is the one you run, and
+it is the one that cannot take you where you are trying to go.
+
+> **Before tuning anything, measure what one more ply of lookahead is worth.**
+> If it dwarfs your weights — and in a game where scoring is a multi-step chain
+> it will — build the search first and tune second.
+
+**What we would do differently, in order.** Measure the value of lookahead.
+Build the search. Log every decision with its rejected alternatives, not just
+the move played. Pin a Control. Only then fit weights, and fit them to decisions
+rather than to outcomes.
 
 **We never produced trustworthy balance data.** This was the original goal and
 we did not reach it. The chain is: legal harness → competent bot → meaningful
