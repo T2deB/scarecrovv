@@ -737,6 +737,59 @@ the same failure mode we hit earlier and documented above — the loop can also
 compound a blind spot, optimising away a capability it never learned to use. The
 guard is the same too: watch a game every round, not only the loss curve.
 
+#### It worked, and the second round did not
+
+Measured, against the strongest vector we had — one produced by fitting outcomes
+and then correcting two features **by hand** after we worked out what the fit had
+got wrong:
+
+```
+                              margin        games won     corpus
+  outcome fit                 -31.57          7-53         2800 games
+  distilled, round 1           +2.27         33-27          500 games
+```
+
+Distillation closed a 34-point gap on **one sixth of the games**, and it
+recovered both hand corrections on its own — no floors, no intervention. Top-1
+agreement was 63.0% against 21.5% chance, which also answers a question worth
+asking before you start: a linear evaluation *can* mostly represent what the
+search prefers.
+
+Then we iterated, and round 2 was worse:
+
+```
+                    top-1        vs the champion      vs its own teacher
+  round 1           63.0%            +2.27                  n/a
+  round 2           65.7%           -15.13              -17.85  [-26.6, -9.1]
+```
+
+**Top-1 went up while strength went down.** That is the trap, and it is worth
+stating on its own line:
+
+> **Top-1 agreement measures fidelity to whatever generated the corpus, not
+> quality.** A better imitator of a worse teacher scores higher on it. It is a
+> useful diagnostic WITHIN a round — near chance means your model cannot
+> represent the search — and meaningless ACROSS rounds. Never promote on it.
+
+The cause was the precondition in the section above going unmet. Round 1's
+student came out *level* with the incumbent, not better — the interval spanned
+zero. So `search(student)` was no stronger than `search(teacher)`, round 2 had
+nothing to learn, and it inherited drift instead.
+
+#### The gate that makes the loop safe
+
+Promote the student to teacher only when it **beat the previous teacher with a
+confidence interval clear of zero**. Otherwise stop, and keep the last student
+that passed.
+
+With that gate our first run would have correctly stopped after round 1. Without
+it, it ran a second round that cost hours and produced a weaker bot, while every
+cheap metric — loss, top-1 — said it was going well.
+
+This is the operational form of "the improvement operator must be stronger than
+what it improves". That sentence is easy to agree with and easy to not
+implement. The gate is the implementation.
+
 #### This is the standard answer, not a clever idea
 
 Chess arrived here decades ago, twice over. Stockfish's NNUE is trained on

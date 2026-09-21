@@ -52,8 +52,12 @@ for n in $(seq 1 $ROUNDS); do
 
   # Against the round's own teacher (did distillation add anything?) and against
   # the standing champion (is it actually good?).
+  # basename: a teacher path like wk/distilled1.json used to put a slash in the
+  # tag, so the redirect wrote to a directory that does not exist and the
+  # round-vs-its-own-teacher match -- the one the promotion gate needs -- was
+  # silently skipped.
   for opp in "$TEACHER" hyb-animals.json scarecrovv-hunter; do
-    tag="r${n}-vs-${opp%%.json}"
+    base="${opp##*/}"; tag="r${n}-vs-${base%%.json}"
     if stage "m-$tag"; then
       print -r -- "--- $tag (already done)"
     else
@@ -65,6 +69,24 @@ for n in $(seq 1 $ROUNDS); do
     tail -6 "wk/match-$tag.txt"
   done
 
-  TEACHER=wk/distilled$n.json
+  # PROMOTION GATE. Only hand the student the teacher's job if it BEAT the
+  # teacher with an interval clear of zero.
+  #
+  # Round 2 of the first run is why this exists. Round 1's student came out
+  # level with the incumbent (+2.27, interval spanning zero), so search(student)
+  # was no stronger than search(teacher) and round 2 had nothing to learn from
+  # -- it inherited drift instead and lost to its own teacher by 17.85 trail.
+  #
+  # Its top-1 agreement went UP while it did so, 63.0% to 65.7%, because top-1
+  # measures fidelity to whatever generated the corpus. A better imitator of a
+  # worse teacher scores higher on it. Never gate on top-1; gate on a match.
+  own="wk/match-r${n}-vs-$(basename ${TEACHER%%.json}).txt"
+  if [[ -s $own ]] && grep -q "^  distilled$n.json .*interval excludes zero" $own; then
+    say "round $n: student beat its teacher — promoting"
+    TEACHER=wk/distilled$n.json
+  else
+    say "round $n: student did NOT beat its teacher — stopping. wk/distilled$n.json is the result."
+    break
+  fi
 done
 say "all rounds done — artefacts in sim/wk/"
