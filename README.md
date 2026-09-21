@@ -239,6 +239,54 @@ Budget accordingly: separating a ~5-point effect from zero took about **60
 paired seeds** in our game, not the 20 we started with. And add a seed-offset
 flag on day one — ours found a real problem the first time it was used.
 
+### Keep one frozen opponent you never touch
+
+An absolute score — points, resources, whatever your game counts — is a real
+signal and mostly enough. If your bot goes from 10 points to 50, it improved.
+You do not need a control to tell you that, and we would not argue otherwise.
+
+Three things break it, and all three bit us.
+
+**Your score depends on who you played.** The same vector of ours scored 61.2,
+55.3 and 49.4 against three different opponents. That is a twelve-point swing
+with nothing changed but the other side of the table, which is wider than most
+of the improvements we were trying to detect.
+
+**A rules change resets the scale.** We capped a scoring route mid-project and
+every number before it became incomparable to every number after. Absolute
+scores do not survive the thing you are building the simulator to help you do.
+
+**In a game with a shared pump, score is not skill.** Ours had a repeatable
+end-game conversion. Two players who both find it both score two hundred, and
+neither is better at beating the other. The number went up; the skill did not.
+Any game with a cooperative or uncontested scoring route has this, and you
+usually find out it has one *after* you have been trusting the number.
+
+The fix is one line of discipline:
+
+> **Pin one weight vector as the Control. Never change it. Measure every later
+> version against it, forever.**
+
+We did not, and instead moved our baseline three times over the project —
+whatever the scripts happened to import. At one point we celebrated a vector for
+beating an opponent we had picked by accident, which a field check later showed
+was neither neutral nor strong. The margin was real. It just was not about
+anything.
+
+Two habits go with it, both cheap:
+
+- **Run the whole field, not one pairing.** Our first field check immediately
+  found a hole a single match had hidden: the same vector beat one opponent
+  by +7.8 and lost to another by -20.5.
+- **When the rules change, retire the Control and cut a new one** from the best
+  vector under the new rules. It is a reference point, not an heirloom.
+
+Use both measures for different questions. Absolute score answers *is the bot
+playing the game at all* — ours scoring 4 trail against a human's 200 was the
+single most useful number in the project. The Control answers *is this version
+better than that one*, which absolute score cannot, because it moves for
+reasons that have nothing to do with your bot.
+
 ### The half of the codebase the harness never touched
 
 Every bug in this document was found by the simulator, in code the simulator
