@@ -944,6 +944,74 @@ answers.
 
 ---
 
+## An avenue we have not taken: a latent state the size of a thought
+
+Recorded because we think it is the most promising thing we did not try, and
+because the fit to a small project is unusually good.
+
+**The gap.** A static evaluation scores each position independently. It has no
+plan. Nothing in `w · x` says "I committed to this line three turns ago and I am
+seeing it through", so the bot re-decides its whole strategy every click and
+drifts. Everything we built has this hole, and no amount of tuning closes it,
+because the thing missing is not a weight — it is a variable that persists.
+
+Our phase taper is the hole in miniature. We decided by hand that the game has
+an early/late axis, wrote a one-dimensional latent into the model, and tuned two
+weight vectors either side of it. It helped. But we chose the dimension, we
+chose what drives it, and we never asked whether it was the right one or whether
+there should be two.
+
+**The idea.** There is a line of work in decision neuroscience on fitting
+**tiny recurrent networks — one to four units** — to trial-by-trial choices, and
+then reading the latent dynamics out. They beat classical hand-crafted cognitive
+models at predicting individual humans and animals, while staying small enough
+to interpret. See Ji-An, Benna & Mattar (Nature, 2025) and Miller et al.'s
+disentangled RNNs (NeurIPS 2023).
+
+The mapping onto a game bot is direct:
+
+| decision neuroscience | a board game bot |
+| --- | --- |
+| trial | one decision |
+| choice between options | choice between the legal moves |
+| a classical cognitive model | your hand-built evaluation |
+| the learned latent state | the plan your evaluation does not have |
+
+Concretely: `score(move) = w(h) · x(move)`, where `h` is a one-to-three unit
+state updated after each decision. Fit it to recorded decisions — the same
+corpus a ranking loss needs, with the rejected alternatives — and then look at
+what `h` learned to carry.
+
+**Why it suits a small project specifically.** The usual reason not to reach for
+a network is that you do not have the data. Here that is the wrong worry: a
+three-unit recurrent model is tens of parameters, and a few hundred recorded
+games is tens of thousands of decisions. The published work fits these to a few
+hundred or a few thousand trials per subject. *Tiny* is the whole point — it is
+what makes the model both trainable on your data and readable afterwards.
+
+**The second prize may be worth more than the first.** If the latent separates
+into something you can name — a phase, plus which strategy the player has
+committed to — that is a finding about how your game is actually played. We
+spent a week discovering by hand that one of our resources was worth five times
+what our evaluation thought. A model that surfaces the structure of a human's
+decisions might have told us sooner, and would have told us in a form we could
+read.
+
+**Two caveats, stated rather than buried.** The interpretation step is
+contested: there is a 2025 commentary arguing that RNN dynamics may not purely
+reflect cognitive strategies, and anyone reaching for this should read it
+alongside the original. That objection is about *reading* the latent, not about
+predicting choices, so the bot use survives it either way. And it needs a
+training pipeline a rules engine does not have — realistically fit it in Python
+and export the small matrices to whatever your game runs in.
+
+**Where it belongs in the order.** After a linear fit, not instead of one. Fit
+the simple model first and see whether human decisions are predictable from your
+features at all. If you end up with a bot that plays reasonable individual moves
+with no through-line, that is the diagnosis that says build this.
+
+---
+
 ## The shape of the code
 
 Nothing here runs as-is: it imports a rules engine that is not published. It is
