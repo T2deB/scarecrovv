@@ -12,7 +12,8 @@ game.
 outcomes stop working, train on decisions instead_ — it is where the project
 ended up and it would have saved most of the rest. Then four more:** _Six ways a simulator lies to you_ — every bug in it
 produced numbers that looked entirely reasonable, and not one was caught by an
-aggregate. _The single most valuable feature shape_ — how to express a game's
+aggregate; read its first entry to the end, because the worst of them came back
+a week after we fixed it. _The single most valuable feature shape_ — how to express a game's
 own knowledge as an evaluation feature without building a knife edge. _A feature
 can fit at zero and be wrong at zero_ — the most expensive single weight we got
 wrong, and the one-line diagnostic that would have caught it. And _Choose your
@@ -65,7 +66,56 @@ plausible-looking mean.
 
 > **Rule:** the simulator must pass through the same legality gate as the
 > server, not merely the same enumeration. Write a test that fails if any driver
-> bypasses it. Ours now greps every file for the pattern.
+> bypasses it. Ours grepped every file for the pattern — which turned out not to
+> be enough.
+
+#### …and then it came back
+
+A week later it was back, and the rule above is part of why we did not see it.
+
+The fix went into one place: the harness's own enumeration. Afterwards we wrote a
+second driver, to run the bot's real search — the one players face — inside the
+simulator, for training and for measuring against the Control. That driver
+handed the search the **raw** enumeration to choose from. It used the legal list
+only to look up the move it was about to apply, and when the lookup failed it
+**applied the raw move anyway**. Our grep saw the legal function named in the
+file and passed it.
+
+Underneath, the rules never enforced the action budget themselves. They relied
+on buttons being marked disabled and on the platform refusing disabled clicks.
+But the platform only refuses them from a *client*. Anything that calls the
+rules directly — the second driver, and the game's own server-side bot — was
+never checked at all. We found it before a bot was deployed, but only just.
+
+Every bot driven that way made about thirty illegal clicks a game, the frozen
+Control included. A week of measurements against the Control were void, every
+training run with them, and so were the fingerprint tests that guard the
+Control: they had faithfully fingerprinted the cheating.
+
+It surfaced because a self-play learner found it. A trained bot began spending
+its first turn taking one resource dozens of times, and its score collapsed. We
+wrote a careful theory about which learned weight had gone wrong. Then the
+person who designed the game said: *that can't happen, the turn clock doesn't
+allow it.* One traced turn showed twenty-eight actions in the bot's first turn.
+The same tell as last time, found the same way: one game, printed with the
+counter the rule is about.
+
+> **Rule:** one definition of "legal", in the engine, and everything that picks
+> a move uses it — the live bot, every simulator driver, every node of the
+> search. Enforce it in the rules path as well, not only in the client or the
+> platform: whatever calls your rules directly bypasses the platform.
+
+> **Rule:** a driver must fail loudly on an illegal choice. A fallback that
+> applies it anyway is how this bug lived twice.
+
+> **Rule:** test the property, not the pattern. A grep for the wrong call guards
+> one way of writing the bug. Replaying every recorded game from its click log
+> and checking that each click was among the legal options at that moment tests
+> what you actually care about. Our fingerprint test now does it on every run,
+> and refuses to record a trace that fails.
+
+> **Rule:** when you fix a bug in one caller, list every caller. We fixed the
+> harness and never asked what else chose moves.
 
 ### 2. "Have I been here before?" kept answering no
 
@@ -185,6 +235,11 @@ us something was wrong; they never once told us what.
 not the last. Print the thing the rule is *about* — if the rule is "two actions
 per turn", print the action counter on every line.
 
+And when someone who knows the rules says a number is impossible, take them
+literally. The second time our worst bug surfaced, the prompt was not an
+aggregate but a person saying *the bot can't have done that* — and printing one
+turn showed they were right within a minute.
+
 ### Make the bot's own rescues visible
 
 Loop guards and fallbacks hide the bug that made them necessary. Ours count
@@ -280,6 +335,14 @@ Two habits go with it, both cheap:
   by +7.8 and lost to another by -20.5.
 - **When the rules change, retire the Control and cut a new one** from the best
   vector under the new rules. It is a reference point, not an heirloom.
+- **A frozen opponent guards against change, not against being wrong.** Ours
+  was frozen while its driver let it make illegal moves (see *…and then it came
+  back*), and the fingerprint test that proves the Control still plays exactly
+  as the day it was frozen dutifully proved it was still cheating. When the
+  driver was fixed we cut a new Control from the same weights under a new name,
+  rather than keep one name for two different opponents, and made the training
+  tool refuse to resume any run started from the old one. The same retirement
+  applies when the Control's *driver* changes, not only the rules.
 
 Use both measures for different questions. Absolute score answers *is the bot
 playing the game at all* — ours scoring 4 trail against a human's 200 was the
@@ -866,6 +929,76 @@ the shape of the effect. A card added later is counted without anyone
 remembering to update the bot. When we did this for one feature it found exactly
 the two cards the design document identified, which was a good sign the
 criterion was right.
+
+---
+
+## Where we are now: self-play that starts from the bot you have
+
+After distillation we moved to temporal-difference self-play, following the
+backgammon-variants work behind Palamedes (Papahristou & Refanidis, 2012). Four
+choices shape it.
+
+- **Start from the bot you have, not from random weights.** A position's value
+  is the existing hand-built linear evaluation plus a small learned correction,
+  and the correction starts at exactly zero. So generation zero *is* the
+  Control: every run starts from a known point, and a run that drifts can be
+  compared with where it began.
+- **Learn inside the search you already have.** Moves are chosen by the same
+  turn-level search the live bot uses, with the learned value at its leaves.
+  TD(λ) moves each end-of-turn position's value towards the next one's, ending
+  in the real result. Reward only the final result: the paper found that an
+  intermediate reward made its bot dogmatic and worse.
+- **Several machines, independent runs, one setting different on each.** The
+  paper found λ and the learning rate were specific to the game, so we don't
+  guess them. Each machine plays its own seed range, nothing is synced mid-run,
+  and every run is measured only against the Control, on an evaluation seed
+  range no run ever trains on.
+- **Built to be stopped.** Every finished game is on disk the moment it ends, a
+  `PAUSE` file makes a run finish its games in progress and wait, it runs at
+  low OS priority, and the same command resumes it. Its settings are fixed at
+  the first start, and a restart with different ones is refused: a run whose
+  settings changed halfway means nothing. Start it in a terminal you own. One
+  started from inside an AI coding session belonged to that session and died
+  with it.
+
+Each of these lessons cost us a round of training.
+
+1. **The search exploits whatever the evaluator gets wrong.** A small hidden
+   layer, trained only on positions that real games pass through, was then asked
+   by the search to value thousands of positions no game reaches. A linear term
+   extrapolates predictably there; a tanh layer outputs anything, and the search
+   is an optimiser that steers straight for it. Splitting the trained value into
+   its parts and measuring each against the Control showed the linear part
+   helping and the hidden layer hurting. Train linear first. Bring the hidden
+   layer back only once it is trained on the positions the search actually
+   queries.
+2. **Never learn from the position after scoring.** End-of-game scoring turned
+   held assets into points but left the assets on the table, so the evaluator
+   counted them twice in that one position. The learner correctly learned
+   "these are worth less" there, and TD carried the lesson back into every
+   earlier position. Stop each trajectory before any step that converts held
+   things into points; its target is still the final result.
+3. **A learner is the most sensitive detector of harness bugs you will build.**
+   It is an optimiser pointed at your simulator, and whatever the harness
+   allows that the rules don't, it will find and lean on. Ours found the illegal
+   moves in *…and then it came back*. So when a learned bot collapses, first
+   ask "what does it do that a human can't?", not "which weight went wrong?".
+   We asked the second question first and wrote a plausible theory about a
+   learned weight. It was explaining behaviour that had no legitimate
+   explanation at all, the same trap as the first time.
+4. **Account for where things went, not only the score.** What settled it was
+   counting, for each side, how many of a resource it took and where every one
+   ended up. One run told "takes too many" apart from "fails to get rid of
+   them", which reading weights never could.
+5. **Self-play score is informative, but not free of the opponent.** In a game
+   with little interaction, a bot's own score in self-play tracks its strength
+   well enough to watch. But a shared, finite supply is a channel between the
+   players: a weak opponent who hoards it changes what you can score. The
+   Control stays the verdict.
+
+**Where it stands:** every run so far trained on the harness with the illegal
+moves, so all of them are void. The next round repeats the last round's
+settings on legal play, partly to find out which of the lessons above survive.
 
 ---
 

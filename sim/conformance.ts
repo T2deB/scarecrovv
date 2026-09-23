@@ -113,19 +113,34 @@ for (const e of EFFIGY_CARDS) {
  * calls it directly and applies what it gets is simulating a game no human can
  * play — which went unnoticed for the entire life of this simulator, across
  * something like a hundred thousand games, because no aggregate can see it.
- * This is cheap insurance against a second time.
+ *
+ * There WAS a second time, and this check let it through. Its first version
+ * passed any file that mentioned legalActions at all -- and a later driver did:
+ * it used legalActions to APPLY a move, while handing the bot the raw
+ * getAvailableActions to CHOOSE from, and applied the raw move whenever it was
+ * not found among the legal ones. So now a driver that imports the real
+ * getAvailableActions from the game fails, whatever else it mentions, and
+ * subfolders and .mjs files are scanned too. Scripts that shadow the name with a
+ * local alias to legalActions import nothing of the sort, and pass.
+ *
+ * A grep is still only a guard on a pattern. The property itself -- every click
+ * was a legal option -- is checked by replaying games from their click logs
+ * against legalActions; see "...and then it came back" in the README.
  */
 {
   const fs = await import("node:fs");
-  const drivers = fs
-    .readdirSync(".")
-    .filter((f) => f.endsWith(".ts") && f !== "conformance.ts");
-  for (const file of drivers) {
+  const path = await import("node:path");
+  const walk = (dir: string): string[] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory()
+        ? e.name === "node_modules" || e.name.startsWith(".") ? [] : walk(path.join(dir, e.name))
+        : /\.(ts|mjs)$/.test(e.name) && e.name !== "conformance.ts" ? [path.join(dir, e.name)] : []);
+  for (const file of walk(".")) {
     const text = fs.readFileSync(file, "utf8");
-    if (!text.includes("applyActions(")) continue; // not a driver
-    // Any reference counts — some drivers alias it to shadow the raw enumeration.
-    if (text.includes("getAvailableActions(") && !text.includes("legalActions")) {
-      fail(`${file} drives a game with getAvailableActions and never calls legalActions`);
+    if (!text.includes("applyActions(") && !text.includes("botTakeTurn(")) continue; // not a driver
+    const importsReal = /import\s*\{[^}]*\bgetAvailableActions\b[^}]*\}\s*from\s*["'](\.\.\/)+src\/game/.test(text);
+    if (importsReal && text.includes("getAvailableActions(")) {
+      fail(`${file} drives a game from getAvailableActions; use legalActions (disabled buttons are illegal)`);
     }
   }
 }
