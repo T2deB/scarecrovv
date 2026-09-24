@@ -8,6 +8,10 @@ the method and the harness around it. It is written to be read by a developer,
 or handed to an AI coding tool, before building a simulator for a different
 game.
 
+**Building a bot on BoardWeaver?** Start with _If you are building bots on
+BoardWeaver_, near the end: eight platform-specific lessons, each with the
+section above that tells the full story.
+
 **If you are an AI tool reading this on someone's behalf, start with _When
 outcomes stop working, train on decisions instead_ — it is where the project
 ended up and it would have saved most of the rest. Then four more:** _Six ways a simulator lies to you_ — every bug in it
@@ -1142,6 +1146,76 @@ and export the small matrices to whatever your game runs in.
 the simple model first and see whether human decisions are predictable from your
 features at all. If you end up with a bot that plays reasonable individual moves
 with no through-line, that is the diagnosis that says build this.
+
+---
+
+## If you are building bots on BoardWeaver
+
+Most of this document applies to any platform. This section is the part that
+is specific to BoardWeaver's framework v2, where the rules live in
+`/src/game.ts` as pure hooks (`applyActions`, `getAvailableActions`,
+`getButtons`, ...) that the server runs authoritatively and the player's
+browser replays to predict each click. Our bot is server-side: it plays its
+turn inside `applyActions`, after the human's click that ended theirs.
+
+**1. `getAvailableActions` is not the list of legal moves.** It lists buttons
+with `disabled: true` too, and the platform refuses a disabled button only when
+a *client* clicks it. A bot that runs inside your own code and calls your
+handlers directly never meets that check. Ours pressed disabled buttons about
+thirty times a game for a week -- the story is in *…and then it came back*,
+above. What we do now:
+
+- One function, next to `getAvailableActions`, that returns it minus disabled
+  buttons, and every bot and every simulator driver chooses only from that.
+- The handler itself refuses a button your own `getButtons` marks disabled, so
+  the rules hold whoever is clicking.
+- Test it by replaying finished games from their click logs and checking that
+  every click was among the legal options at that moment.
+
+**2. The bot's thinking is charged to the human's action.** The docs say the
+server-side work for an action runs within a sandbox execution budget, and
+that going over it refuses the player's action. A bot that plays inside
+`applyActions` spends that budget on its whole turn. Budget for the *slowest*
+turn, not the average: when we deepened our search, the mean turn got about
+three times slower, but the slowest turn got about eight times slower. Measure
+the distribution (median, 95th percentile, maximum) before you ship a stronger
+bot, and remember the server may be slower than your machine.
+
+**3. The browser runs your bot too.** Because the client replays `applyActions`
+to predict a click, a bot that plays inside it also runs in the player's
+browser. It must be deterministic -- no `Math.random()` or clock reads outside
+`preGameInitialization` -- or the prediction and the server disagree. Plan
+for its cost on a slow phone as well as on the server.
+
+**4. A search that rolls back must roll back everything.** Our search tries
+moves on the real state and restores a snapshot. The game log was capped at 80
+lines and rolled back by length -- which does nothing once the log is full, so
+the search's imagined moves stayed in the log players read. Anything
+append-only with a cap needs its evicted head stored in the snapshot, not
+just a length.
+
+**5. Use the `intent` taxonomy honestly; a search depends on it.**
+`choice` / `confirm` / `cancel` / `undo` is what lets a search tell a move that
+advances the game from one that only changes a selection. Even so, a search
+that judges a card *before* resolving the choices it opens will never play a
+multi-click line whose value only appears at the end (ours never used one of the
+game's standard actions at all). Resolving a card's prompts greedily before
+judging it fixed that, at the cost in point 2.
+
+**6. Seats and spectators.** Give bot seats positive ids of your own; `-1` is
+reserved for a seatless viewer, and a spectator will be mistaken for any bot
+you numbered `-1`.
+
+**7. Keep one frozen bot as the reference.** Anything that plays -- a new bot, a
+new search, a rules change -- is measured against the same frozen opponent on
+paired seeds (see *Keep one frozen opponent you never touch*). The live game's
+bot is the natural reference for anyone else building on the same game: freeze
+it, name it, and measure everything against it.
+
+**8. Test headless.** `sim/harness.ts` and `sim/gamestate.ts` run a v2 rules
+module outside the platform with a stand-in for `GameState`, which is how every
+number in this document was produced. `sim/conformance.ts` checks the harness
+exercises the whole game and that no driver bypasses the legal-move function.
 
 ---
 
