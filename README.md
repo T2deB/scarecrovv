@@ -9,12 +9,15 @@ or handed to an AI coding tool, before building a simulator for a different
 game.
 
 **Building a bot on BoardWeaver?** Start with _If you are building bots on
-BoardWeaver_, near the end: eight platform-specific lessons, each with the
-section above that tells the full story.
+BoardWeaver_, near the end: platform-specific lessons, each with the section
+above that tells the full story.
+
+**Newest:** _When one phase of the game plays by different rules, train it on
+its own_ -- what moved a bot that plain self-play had stopped improving.
 
 **If you are an AI tool reading this on someone's behalf, start with _When
 outcomes stop working, train on decisions instead_ — it is where the project
-ended up and it would have saved most of the rest. Then four more:** _Six ways a simulator lies to you_ — every bug in it
+ended up and it would have saved most of the rest. Then four more:** _Seven ways a simulator lies to you_ — every bug in it
 produced numbers that looked entirely reasonable, and not one was caught by an
 aggregate; read its first entry to the end, because the worst of them came back
 a week after we fixed it. _The single most valuable feature shape_ — how to express a game's
@@ -39,7 +42,7 @@ lies.
 
 ---
 
-## Six ways a simulator lies to you
+## Seven ways a simulator lies to you
 
 In the order they cost us, worst first. Every one produced believable output.
 
@@ -217,6 +220,32 @@ The same mistake, twice more:
 > **Rule:** every assumption borrowed from chess engine literature is a
 > hypothesis about *your* game. Test the obvious ones. When a sanity check
 > fires, suspect the check.
+
+### 7. Work the budget never counted
+
+Our search has a node budget per turn, and it held -- for the search. Then we
+taught it to resolve a card's choices before judging the card (see _Search and
+evaluation do different jobs_): at each prompt, try every answer, keep the best,
+and settle what that answer opens in turn. That work ran *inside* each searched
+node and was never charged to the budget. It is a product of nested loops, so
+it is harmless almost everywhere and enormous in a few positions: a handful of
+turns took minutes, and one game took well over an hour, stalling a whole
+training generation on one worker while the rest waited.
+
+Nothing was wrong with any number the bot produced. It was only slow, rarely,
+and a rare slowness in one game of hundreds looks exactly like a hung machine.
+A session on another machine found it by timing the one stuck game from
+outside and replaying it turn by turn.
+
+The fix was two deterministic caps, sized from the distribution of real turns:
+answers scored per settle, and per turn, past which that part of the search
+falls back to its plain behaviour. Plus a repeat check inside the settling loop,
+because some choices can be picked and unpicked forever. The bot's measured
+strength did not move; the worst turn went from minutes to under two.
+
+> **Rule:** every loop inside the search is part of the search's cost. If a
+> budget counts only the outer loop, measure the *tail* of the time per turn,
+> not the mean -- the mean will look fine.
 
 ---
 
@@ -1000,9 +1029,98 @@ Each of these lessons cost us a round of training.
    players: a weak opponent who hoards it changes what you can score. The
    Control stays the verdict.
 
-**Where it stands:** every run so far trained on the harness with the illegal
-moves, so all of them are void. The next round repeats the last round's
-settings on legal play, partly to find out which of the lessons above survive.
+**Where it stands:** the runs on the illegal-move harness were void, and the
+round after repeated them on legal play. The lessons above survived. Self-play
+then did what the literature says it does: it improved the bot clearly against
+the Control, and then every run levelled off -- different settings, different
+features, three machines, all flat for hundreds of generations. What moved it
+again is the next section.
+
+---
+
+## When one phase of the game plays by different rules, train it on its own
+
+Near its end our game changes shape. Each player, at a moment of their own,
+steps into a final phase where the rules are different: the market closes to
+them, actions stop being counted, and their deck stops reshuffling -- whatever
+is still in the draw pile and hand is all they will ever play again. Every bot
+we trained was weakest there, relative to a human, by far. And the designer's
+own best games are won in exactly that phase.
+
+**Why plain self-play could not learn it.** It is a different game played by
+the same evaluation. The weights that judge the long middle of the game also
+judge the finale, and the finale rewards different things: cards you can still
+*reach* rather than cards you own; resources that only pay out there; a turn
+that is one long chain rather than a couple of actions. Worse, it is circular.
+The bot played the phase badly, so its self-play never saw the payoff of
+preparing for it, so it never learned to prepare, so the phase stayed bad. A
+strategy that invests early and cashes in at the end -- which is how the
+designer plays -- looked worthless to it at every step.
+
+A statistical screen on its games could not find the value either, for the
+same reason: you cannot measure the worth of a thing the policy never does.
+Twice we tried to price a feature from self-play and found the data saying the
+opposite of the rules, because the bot never exercised it.
+
+**What we did.** Treat the phase as its own problem.
+
+1. **Capture real entry positions.** Play ordinary self-play games and save the
+   complete game state at the exact move each player enters the phase. Real
+   positions, with real decks built by the real bot -- not a synthetic setup.
+   (We considered starting the phase from early-game decks, which is cheaper,
+   and rejected it: the phase is about what you built, and a starter deck under
+   the phase's rules is a different, easier puzzle.)
+2. **Diagnose before you train.** Finish each saved position several ways on
+   the *same* hidden order, so the comparison is paired: the normal search, a
+   much deeper search, and a search that resolves each card's choices before
+   judging it. Depth helped a little. Judging choices properly helped about
+   twice as much, and made the bot take far more actions in the phase, because
+   its stopping rule ("end the turn when nothing beats standing still") had been
+   firing early -- every remaining move was a card whose value only appears
+   after its choice is made. So the problem was judgement, not lookahead.
+3. **Be careful what you call a ceiling.** We estimated the best achievable
+   finish per position with a very expensive search that could even see the
+   hidden order. The trained value then beat that "ceiling" comfortably. The
+   solver had searched hard but judged positions with the *old* evaluation, so
+   it had measured the ceiling of that evaluation, not of the game.
+4. **Learn the phase's value from played-out results, not by bootstrapping.**
+   The phase is single-player in effect, short, and scored unambiguously, which
+   is the easy case: play each saved position out to the end several times,
+   *reshuffling the hidden cards each time* so the value learns the deck rather
+   than one order, and record every position passed through with the score still
+   to come. Fit a separate set of weights to that (a plain regression was
+   enough), holding out whole entry positions, never individual rows -- rows
+   from one entry position are near-copies of each other. Then refit on playouts
+   that use the new weights, a couple of rounds.
+5. **Name what scores in the phase, not what merely moves things.** The
+   features that mattered were phase-specific: cards still reachable, cards
+   stranded where they can no longer be drawn, outlets that actually convert
+   resources to score *under the phase's rules*. The designer corrected our
+   first list: two of the "outlets" we counted move a resource without scoring
+   it once the phase has begun. A designer reading your feature list is a cheap
+   and excellent review.
+6. **Switch evaluations at the boundary, and let it reach back.** The bot uses
+   the phase value the moment it enters the phase, mid-turn. Because its search
+   looks a few moves ahead, positions just past the boundary are scored by the
+   phase value too -- so the *approach* to the phase gets priced without any
+   hand-made feature: arriving with cards still to draw now looks better than
+   arriving with everything stranded. That was the designer's intuition, and it
+   fell out of the construction rather than being bolted on.
+
+**What it did.** On entry positions it had never seen, the bot scored far more
+in the phase: it drew through its deck, recovered stored resources and cashed
+them, and stopped carrying liabilities into the final count -- the moves a
+strong human makes there. Over whole games against the Control it was the best
+bot we had produced, with no further training and no change to its play before
+the phase. Longer self-play runs that train the rest of the evaluation *with*
+the phase value in place are running as this is written; we are not claiming
+their result yet.
+
+> **Rule:** if one phase of your game has different rules, the bot's single
+> evaluation will be mediocre at it, and self-play can stay stuck there
+> because it never sees the payoff of preparing. Capture real entry positions,
+> diagnose with paired finishes, and learn that phase's value on its own --
+> then let the search carry it back across the boundary.
 
 ---
 
@@ -1172,14 +1290,36 @@ above. What we do now:
 - Test it by replaying finished games from their click logs and checking that
   every click was among the legal options at that moment.
 
-**2. The bot's thinking is charged to the human's action.** The docs say the
-server-side work for an action runs within a sandbox execution budget, and
-that going over it refuses the player's action. A bot that plays inside
-`applyActions` spends that budget on its whole turn. Budget for the *slowest*
-turn, not the average: when we deepened our search, the mean turn got about
-three times slower, but the slowest turn got about eight times slower. Measure
-the distribution (median, 95th percentile, maximum) before you ship a stronger
-bot, and remember the server may be slower than your machine.
+**2. The bot's thinking is charged to the human's action -- five seconds of
+it.** Server-side work for an action runs within a sandbox budget (the
+developers told us: five seconds per player action), and going over refuses the
+player's action. A bot that plays inside `applyActions` spends that budget on
+its whole turn. Budget for the *slowest* turn, not the average: when we deepened
+our search, the mean turn got about three times slower, but the slowest turn got
+about eight times slower.
+
+**The server is much slower than your machine, and not evenly.** We shipped a
+bot that took a fraction of a second per turn locally, and every one of its
+turns timed out on the server. Timing single operations in the sandbox showed
+why: every read of the platform's `GameState` cost on the order of a hundred
+times what the same read costs on a plain object -- evaluating one position
+took hundreds of milliseconds, and a search makes thousands of reads. What
+worked: **copy the table once** into a plain in-memory state at the start of
+the bot's turn (the headless harness's own `GameState` stand-in, which already
+implements the whole surface the rules touch), play the entire turn on the
+copy, and write back only what changed. Even then the sandbox ran roughly ten
+times slower than a laptop, and slower still late in the game as the state
+grew -- so time early, middle and late turns on the server, not just the first.
+
+**Budget in work, never in seconds.** Our first safety net was a clock: past
+three seconds, finish the turn cheaply. It fired, and made two things worse.
+Play depended on how busy the server was at that moment, so the same game could
+not be replayed, and the cheap fallback took the first option on offer -- an
+obviously bad move a player noticed. We now count *work* (moves tried, move
+lists built, positions judged), cap it per turn by game phase, and past the
+cap the bot plays one move deep: shallower, never blind, and exactly the same
+on the server, in the browser and in a replay. The clock stays only as an
+emergency stop that should never fire.
 
 **3. The browser runs your bot too.** Because the client replays `applyActions`
 to predict a click, a bot that plays inside it also runs in the player's
@@ -1202,9 +1342,19 @@ multi-click line whose value only appears at the end (ours never used one of the
 game's standard actions at all). Resolving a card's prompts greedily before
 judging it fixed that, at the cost in point 2.
 
-**6. Seats and spectators.** Give bot seats positive ids of your own; `-1` is
-reserved for a seatless viewer, and a spectator will be mistaken for any bot
-you numbered `-1`.
+**6. Seats, spectators, and a bot in a one-player game.** Give bot seats
+positive ids of your own; `-1` is reserved for a seatless viewer, and a
+spectator will be mistaken for any bot you numbered `-1`. v2 has no API to add
+a player, so a one-player game cannot seat a bot. What works (another
+BoardWeaver designer's approach): a **virtual side** -- create its per-player
+spaces yourself, tagged with an id no real seat has, keep its player state in
+your own metadata, and have every rule iterate one function that returns "the
+seated players plus the virtual one" instead of `state.players()`. A rule that
+still reads `state.players()` silently plays a one-sided game, so find them
+all. Two traps: the sandbox's whole-state writes refuse spaces owned by a
+player who is not seated, and a turn that hands play back to the human looks,
+to a "same player active before and after" check, like no turn happened --
+ours offered an undo that would have rewound the bot's entire turn.
 
 **7. Keep one frozen bot as the reference.** Anything that plays -- a new bot, a
 new search, a rules change -- is measured against the same frozen opponent on
@@ -1212,7 +1362,18 @@ paired seeds (see *Keep one frozen opponent you never touch*). The live game's
 bot is the natural reference for anyone else building on the same game: freeze
 it, name it, and measure everything against it.
 
-**8. Test headless.** `sim/harness.ts` and `sim/gamestate.ts` run a v2 rules
+**8. Small frame rules that each cost a round trip.** The frame refuses new-tab
+links (our in-game rules link did nothing; the platform's header links the rules
+anyway). `navigator.clipboard.writeText` is refused, but
+`document.execCommand("copy")` over an off-screen, selected textarea works --
+another designer's finding; try it first, and say "copied" only when it
+reports success. The server may hand stored state back with object keys in a
+different order, so a replay that compares recorded events must compare them
+key-order-insensitively. And a hand-written stand-in for the platform's types
+is not its type checker: run `validate_code` on what you uploaded before you
+commit, because it catches what your stand-in allows.
+
+**9. Test headless.** `sim/harness.ts` and `sim/gamestate.ts` run a v2 rules
 module outside the platform with a stand-in for `GameState`, which is how every
 number in this document was produced. `sim/conformance.ts` checks the harness
 exercises the whole game and that no driver bypasses the legal-move function.
